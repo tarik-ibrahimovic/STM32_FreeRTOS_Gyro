@@ -22,12 +22,13 @@ Below is described a set of tasks, be it periodic or aperiodic, imposed on the R
     - Send Gyro measurement when there is a >5% change in value (aperiodic) (mutex)
 
 Illustrating the implementation is the inserted block diagram, with inputs on top, processing in the middle, and outputs on the bottom.
+
 ![System implementation block diagram](/0.doc/IO.png)
 
 ## Example execution
 When executed, here is an example of the expected output on the serial port, and this is how SystemView should display task execution.
 ![Serial port read](/0.doc/serial.png)
-![SystemView task execution](/0.doc/IO.png)
+![SystemView task execution](/0.doc/systemview.png)
 
 
 
