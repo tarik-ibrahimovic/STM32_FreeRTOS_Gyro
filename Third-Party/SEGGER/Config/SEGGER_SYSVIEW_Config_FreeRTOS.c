@@ -1,0 +1,145 @@
+/*********************************************************************
+*                SEGGER Microcontroller GmbH & Co. KG                *
+*                        The Embedded Experts                        *
+**********************************************************************
+*                                                                    *
+*       (c) 2015 - 2017  SEGGER Microcontroller GmbH & Co. KG        *
+*                                                                    *
+*       www.segger.com     Support: support@segger.com               *
+*                                                                    *
+**********************************************************************
+*                                                                    *
+*       SEGGER SystemView * Real-time application analysis           *
+*                                                                    *
+**********************************************************************
+*                                                                    *
+* All rights reserved.                                               *
+*                                                                    *
+* SEGGER strongly recommends to not make any changes                 *
+* to or modify the source code of this software in order to stay     *
+* compatible with the RTT protocol and J-Link.                       *
+*                                                                    *
+* Redistribution and use in source and binary forms, with or         *
+* without modification, are permitted provided that the following    *
+* conditions are met:                                                *
+*                                                                    *
+* o Redistributions of source code must retain the above copyright   *
+*   notice, this list of conditions and the following disclaimer.    *
+*                                                                    *
+* o Redistributions in binary form must reproduce the above          *
+*   copyright notice, this list of conditions and the following      *
+*   disclaimer in the documentation and/or other materials provided  *
+*   with the distribution.                                           *
+*                                                                    *
+* o Neither the name of SEGGER Microcontroller GmbH & Co. KG         *
+*   nor the names of its contributors may be used to endorse or      *
+*   promote products derived from this software without specific     *
+*   prior written permission.                                        *
+*                                                                    *
+* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND             *
+* CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,        *
+* INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF           *
+* MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE           *
+* DISCLAIMED. IN NO EVENT SHALL SEGGER Microcontroller BE LIABLE FOR *
+* ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR           *
+* CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT  *
+* OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;    *
+* OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF      *
+* LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT          *
+* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE  *
+* USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH   *
+* DAMAGE.                                                            *
+*                                                                    *
+**********************************************************************
+*                                                                    *
+*       SystemView version: V2.52d                                    *
+*                                                                    *
+**********************************************************************
+-------------------------- END-OF-HEADER -----------------------------
+
+File    : SEGGER_SYSVIEW_Config_FreeRTOS.c
+Purpose : Sample setup configuration of SystemView with FreeRTOS.
+Revision: $Rev: 7745 $
+*/
+#include "FreeRTOS.h"
+#include "SEGGER_SYSVIEW.h"
+
+extern const SEGGER_SYSVIEW_OS_API SYSVIEW_X_OS_TraceAPI;
+extern volatile unsigned int SEGGER_SYSVIEW_TickCnt;
+
+/*********************************************************************
+*
+*       Defines, configurable
+*
+**********************************************************************
+*/
+#define SCB_ICSR  (*(volatile U32*) (0xE000ED04uL))
+// Interrupt Control State Register
+#define SCB_ICSR_PENDSTSET_MASK     (1UL << 26)
+// SysTick pending bit
+#define SYST_RVR  (*(volatile U32*) (0xE000E014uL))
+// SysTick Reload Value Register
+#define SYST_CVR  (*(volatile U32*) (0xE000E018uL)) // SysTick Current Value Register
+
+// The application name to be displayed in SystemViewer
+#define SYSVIEW_APP_NAME        "SRV LAB 3"
+
+// The target device name
+#define SYSVIEW_DEVICE_NAME     "STM32F051R8 - Cortex-M0"
+
+// Frequency of the timestamp. Must match SEGGER_SYSVIEW_GET_TIMESTAMP in SEGGER_SYSVIEW_Conf.h
+#define SYSVIEW_TIMESTAMP_FREQ  (configCPU_CLOCK_HZ)
+
+// System Frequency. SystemcoreClock is used in most CMSIS compatible projects.
+#define SYSVIEW_CPU_FREQ        configCPU_CLOCK_HZ
+
+// The lowest RAM address used for IDs (pointers)
+#define SYSVIEW_RAM_BASE        (0x20000000)
+
+/********************************************************************* 
+*
+*       _cbSendSystemDesc()
+*
+*  Function description
+*    Sends SystemView description strings.
+*/
+static void _cbSendSystemDesc(void) {
+  SEGGER_SYSVIEW_SendSysDesc("N="SYSVIEW_APP_NAME",D="SYSVIEW_DEVICE_NAME",O=FreeRTOS");
+  SEGGER_SYSVIEW_SendSysDesc("I#15=SysTick,I#21=PushButton,I#33=HAL_Tick");//,I#33=HAL_Tick"
+}
+
+/*********************************************************************
+*
+*       Global functions
+*
+**********************************************************************
+*/
+void SEGGER_SYSVIEW_Conf(void) {
+  SEGGER_SYSVIEW_Init(SYSVIEW_TIMESTAMP_FREQ, SYSVIEW_CPU_FREQ, 
+                      &SYSVIEW_X_OS_TraceAPI, _cbSendSystemDesc);
+  SEGGER_SYSVIEW_SetRAMBase(SYSVIEW_RAM_BASE);
+}
+
+
+U32 SEGGER_SYSVIEW_X_GetTimestamp(void)
+{
+	U32 TickCount;
+	U32 Cycles;
+	U32 CyclesPerTick;
+	//  // Get the cycles of the current system tick.
+	// SysTick is down-counting, subtract the current value from the number of cycles per tick.
+    CyclesPerTick = SYST_RVR + 1;
+	Cycles = (CyclesPerTick - SYST_CVR);  //
+	// Get the system tick count.  //
+	//SEGGER_SYSVIEW_LOCK();
+	TickCount = SEGGER_SYSVIEW_TickCnt;  //  // If a SysTick interrupt is pending, re-read timer and adjust result  //
+	//SEGGER_SYSVIEW_UNLOCK();
+	if ((SCB_ICSR & SCB_ICSR_PENDSTSET_MASK) != 0)
+	{
+		Cycles = (CyclesPerTick - SYST_CVR);    TickCount++;
+	}
+	Cycles += TickCount * CyclesPerTick;
+	return Cycles;
+}
+
+/*************************** End of file ****************************/
